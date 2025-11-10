@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { PointerLockControls, Sky, Box, Plane, Text } from '@react-three/drei';
 import * as THREE from 'three';
@@ -175,6 +175,17 @@ interface Game3DProps {
 export default function Game3D({ onStartWork }: Game3DProps) {
   const [playerPosition, setPlayerPosition] = useState<[number, number, number]>([0, 1.7, 5]);
   const [locked, setLocked] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [webGLSupported, setWebGLSupported] = useState(true);
+
+  useEffect(() => {
+    const checkMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    setIsMobile(checkMobile);
+
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    setWebGLSupported(!!gl);
+  }, []);
 
   const handleKeyPress = (e: KeyboardEvent) => {
     if (e.key === 'e' || e.key === 'E') {
@@ -193,6 +204,31 @@ export default function Game3D({ onStartWork }: Game3DProps) {
   if (typeof window !== 'undefined') {
     window.removeEventListener('keypress', handleKeyPress);
     window.addEventListener('keypress', handleKeyPress);
+  }
+
+  if (isMobile || !webGLSupported) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-orange-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-xl p-8 text-center space-y-6">
+          <div className="text-6xl mb-4">📱</div>
+          <h2 className="text-2xl font-bold text-gray-900">3D-режим недоступен</h2>
+          <p className="text-gray-600">
+            {!webGLSupported 
+              ? 'Ваш браузер не поддерживает WebGL для 3D-графики.'
+              : 'На мобильных устройствах 3D-режим не поддерживается.'}
+          </p>
+          <p className="text-gray-600">
+            Но вы можете сразу перейти к работе!
+          </p>
+          <button
+            onClick={onStartWork}
+            className="w-full bg-primary text-white py-4 px-6 rounded-lg text-lg font-semibold hover:opacity-90 transition-opacity"
+          >
+            Начать работу
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
