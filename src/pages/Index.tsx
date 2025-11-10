@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -7,7 +7,9 @@ import { Input } from '@/components/ui/input';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 import CharacterSelect from '@/components/CharacterSelect';
-import Game3D from '@/components/Game3D';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+
+const Game3D = lazy(() => import('@/components/Game3D'));
 
 interface Character {
   id: string;
@@ -35,11 +37,32 @@ interface Customer {
   waitTime: number;
 }
 
+const checkWebGLSupport = () => {
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    return !!gl;
+  } catch (e) {
+    return false;
+  }
+};
+
+const isMobileDevice = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
+
 const Index = () => {
   const [gameState, setGameState] = useState<GameState>('character-select');
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [energy, setEnergy] = useState(100);
   const [rating, setRating] = useState(5.0);
+  const [canUse3D, setCanUse3D] = useState(true);
+
+  useEffect(() => {
+    const webGLSupported = checkWebGLSupport();
+    const isMobile = isMobileDevice();
+    setCanUse3D(webGLSupported && !isMobile);
+  }, []);
   const [scannedCode, setScannedCode] = useState('');
   const [currentView, setCurrentView] = useState<'reception' | 'warehouse' | 'customer'>('reception');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -54,8 +77,13 @@ const Index = () => {
 
   const handleCharacterSelect = (character: Character) => {
     setSelectedCharacter(character);
-    setGameState('exploring');
-    toast.success(`Добро пожаловать, ${character.name}!`);
+    if (canUse3D) {
+      setGameState('exploring');
+      toast.success(`Добро пожаловать, ${character.name}!`);
+    } else {
+      setGameState('working');
+      toast.success(`Добро пожаловать, ${character.name}! Приступаем к работе`);
+    }
   };
 
   const handleStartWork = () => {
@@ -175,7 +203,64 @@ const Index = () => {
   }
 
   if (gameState === 'exploring') {
-    return <Game3D onStartWork={handleStartWork} />;
+    if (!canUse3D) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-orange-50 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white rounded-lg shadow-xl p-8 text-center space-y-6">
+            <div className="text-6xl mb-4">📱</div>
+            <h2 className="text-2xl font-bold text-gray-900">3D-режим недоступен</h2>
+            <p className="text-gray-600">
+              На вашем устройстве 3D-режим не поддерживается.
+            </p>
+            <p className="text-gray-600">
+              Но вы можете сразу перейти к работе!
+            </p>
+            <button
+              onClick={handleStartWork}
+              className="w-full bg-primary text-white py-4 px-6 rounded-lg text-lg font-semibold hover:opacity-90 transition-opacity"
+            >
+              Начать работу
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <ErrorBoundary
+        fallback={
+          <div className="min-h-screen bg-gradient-to-br from-blue-50 to-orange-50 flex items-center justify-center p-4">
+            <div className="max-w-md w-full bg-white rounded-lg shadow-xl p-8 text-center space-y-6">
+              <div className="text-6xl mb-4">⚠️</div>
+              <h2 className="text-2xl font-bold text-gray-900">3D-режим недоступен</h2>
+              <p className="text-gray-600">
+                Ваш браузер не поддерживает 3D-графику.
+              </p>
+              <p className="text-gray-600">
+                Но вы можете сразу перейти к работе!
+              </p>
+              <button
+                onClick={handleStartWork}
+                className="w-full bg-primary text-white py-4 px-6 rounded-lg text-lg font-semibold hover:opacity-90 transition-opacity"
+              >
+                Начать работу
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <Suspense fallback={
+          <div className="min-h-screen bg-gradient-to-br from-blue-50 to-orange-50 flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <div className="text-6xl animate-bounce">🚀</div>
+              <p className="text-xl font-semibold text-gray-700">Загрузка 3D-мира...</p>
+            </div>
+          </div>
+        }>
+          <Game3D onStartWork={handleStartWork} />
+        </Suspense>
+      </ErrorBoundary>
+    );
   }
 
   return (
