@@ -6,6 +6,18 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
+import CharacterSelect from '@/components/CharacterSelect';
+import Game3D from '@/components/Game3D';
+
+interface Character {
+  id: string;
+  name: string;
+  gender: 'male' | 'female';
+  icon: string;
+  description: string;
+}
+
+type GameState = 'character-select' | 'exploring' | 'working';
 
 interface Order {
   id: string;
@@ -24,21 +36,37 @@ interface Customer {
 }
 
 const Index = () => {
+  const [gameState, setGameState] = useState<GameState>('character-select');
+  const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [energy, setEnergy] = useState(100);
   const [rating, setRating] = useState(5.0);
-  const [shift, setShift] = useState<'morning' | 'day' | 'evening'>('morning');
-  const [gameStarted, setGameStarted] = useState(false);
   const [scannedCode, setScannedCode] = useState('');
   const [currentView, setCurrentView] = useState<'reception' | 'warehouse' | 'customer'>('reception');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [customerQueue, setCustomerQueue] = useState<Customer[]>([]);
   const [currentCustomer, setCurrentCustomer] = useState<Customer | null>(null);
-  const [orders, setOrders] = useState<Order[]>([
+  const [orders] = useState<Order[]>([
     { id: '1', code: '1234', cell: 'A-15', customerName: 'Иванов И.И.', arrived: Date.now() },
     { id: '2', code: '5678', cell: 'B-23', customerName: 'Петрова А.С.', arrived: Date.now() },
     { id: '3', code: '9012', cell: 'C-08', customerName: 'Сидоров П.П.', arrived: Date.now() },
     { id: '4', code: '3456', cell: 'A-42', customerName: 'Козлова М.В.', arrived: Date.now() },
   ]);
+
+  const handleCharacterSelect = (character: Character) => {
+    setSelectedCharacter(character);
+    setGameState('exploring');
+    toast.success(`Добро пожаловать, ${character.name}!`);
+  };
+
+  const handleStartWork = () => {
+    setGameState('working');
+    toast.success('Смена началась! Приступайте к работе');
+  };
+
+  const handleExitWork = () => {
+    setGameState('exploring');
+    toast.info('Вы вышли из рабочей зоны');
+  };
 
   const generateCustomer = () => {
     const names = ['Иванов', 'Петрова', 'Сидоров', 'Козлова', 'Морозов', 'Новикова'];
@@ -56,7 +84,7 @@ const Index = () => {
   };
 
   useEffect(() => {
-    if (!gameStarted) return;
+    if (gameState !== 'working') return;
 
     const energyTimer = setInterval(() => {
       setEnergy(prev => Math.max(0, prev - 0.5));
@@ -87,12 +115,9 @@ const Index = () => {
       clearInterval(customerTimer);
       clearInterval(queueTimer);
     };
-  }, [gameStarted, customerQueue.length, orders]);
+  }, [gameState, customerQueue.length, orders]);
 
-  const startGame = () => {
-    setGameStarted(true);
-    toast.success('Смена началась! Удачи!');
-  };
+
 
   const handleScan = () => {
     const order = orders.find(o => o.code === scannedCode);
@@ -108,10 +133,7 @@ const Index = () => {
     }
   };
 
-  const handleCustomerService = (customer: Customer) => {
-    setCurrentCustomer(customer);
-    setCurrentView('customer');
-  };
+
 
   const handleGiveOrder = () => {
     if (currentCustomer && selectedOrder && currentCustomer.orderCode === selectedOrder.code) {
@@ -119,7 +141,7 @@ const Index = () => {
       setRating(prev => Math.min(5, prev + 0.1 + moodBonus));
       setEnergy(prev => Math.max(0, prev - 5));
       
-      setOrders(prev => prev.filter(o => o.id !== selectedOrder.id));
+
       setCustomerQueue(prev => prev.filter(c => c.id !== currentCustomer.id));
       
       toast.success('Заказ выдан! Клиент доволен');
@@ -148,44 +170,12 @@ const Index = () => {
     }
   };
 
-  if (!gameStarted) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-orange-50 flex items-center justify-center p-4">
-        <Card className="max-w-2xl w-full p-8 text-center space-y-6">
-          <div className="space-y-2">
-            <h1 className="text-5xl font-bold text-primary">Симулятор ПВЗ OZON</h1>
-            <p className="text-xl text-muted-foreground">Песочница сотрудника пункта выдачи</p>
-          </div>
-          
-          <div className="space-y-4 text-left">
-            <h2 className="text-2xl font-semibold">Ваши задачи:</h2>
-            <ul className="space-y-2 text-lg">
-              <li className="flex items-start gap-2">
-                <Icon name="Package" className="text-primary mt-1" size={20} />
-                <span>Принимать и сканировать посылки от курьеров</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <Icon name="Search" className="text-primary mt-1" size={20} />
-                <span>Искать заказы на складе по номеру ячейки</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <Icon name="Users" className="text-primary mt-1" size={20} />
-                <span>Выдавать заказы клиентам по коду</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <Icon name="Star" className="text-primary mt-1" size={20} />
-                <span>Поддерживать высокий рейтинг ПВЗ</span>
-              </li>
-            </ul>
-          </div>
+  if (gameState === 'character-select') {
+    return <CharacterSelect onSelect={handleCharacterSelect} />;
+  }
 
-          <Button size="lg" onClick={startGame} className="w-full text-lg py-6">
-            <Icon name="PlayCircle" className="mr-2" />
-            Начать смену
-          </Button>
-        </Card>
-      </div>
-    );
+  if (gameState === 'exploring') {
+    return <Game3D onStartWork={handleStartWork} />;
   }
 
   return (
@@ -195,8 +185,7 @@ const Index = () => {
           <div className="flex items-center gap-4">
             <div className="text-3xl font-bold text-primary">OZON ПВЗ</div>
             <Badge variant="outline" className="text-sm">
-              <Icon name="Clock" size={16} className="mr-1" />
-              {shift === 'morning' ? '8:00-12:00' : shift === 'day' ? '12:00-18:00' : '18:00-22:00'}
+              {selectedCharacter?.icon} {selectedCharacter?.name}
             </Badge>
           </div>
           
@@ -218,13 +207,10 @@ const Index = () => {
               <div className="text-2xl font-bold text-primary">{rating.toFixed(1)}</div>
             </div>
             
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <Icon name="Users" size={16} className="text-blue-500" />
-                Очередь
-              </div>
-              <div className="text-2xl font-bold text-primary">{customerQueue.length}</div>
-            </div>
+            <Button variant="outline" onClick={handleExitWork}>
+              <Icon name="LogOut" className="mr-2" size={16} />
+              Выйти
+            </Button>
           </div>
         </div>
       </div>
@@ -353,7 +339,7 @@ const Index = () => {
                       className={`p-4 cursor-pointer transition-all hover:shadow-md ${
                         currentCustomer?.id === customer.id ? 'border-primary border-2 bg-blue-50' : ''
                       }`}
-                      onClick={() => handleCustomerService(customer)}
+                      onClick={() => setCurrentCustomer(customer)}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
